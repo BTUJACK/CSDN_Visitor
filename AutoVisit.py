@@ -13,22 +13,11 @@ from multiprocessing import Process
 
 
 def main():
-    proxy_database_name = "ProxyIP.db"
-    info_database_name = "../INFO.db"
-    valid_ip_table_name = "ip_table"
-    all_ip_table_name = "all_ip_table"
-    info_table_name = "info_table"
     blogger = "zyc121561"
     # 初始化
-    crawl = Crawl(proxy_database_name, valid_ip_table_name, all_ip_table_name)
-    validation = Validation(proxy_database_name, valid_ip_table_name,
-                            all_ip_table_name)
-    visitor = CSDNBlogVisitor(
-        bolgger=blogger,
-        proxy_database_name=proxy_database_name,
-        info_database_name=info_database_name,
-        ip_table_name=valid_ip_table_name,
-        info_table=info_table_name)
+    crawl = Crawl()
+    validation = Validation()
+    visitor = CSDNBlogVisitor(bolgger=blogger)
     # 启动
     pro1 = Process(target=crawl.run)  # 抓取代理IP
     pro2 = Process(target=validation.run)  # 定期校验代理IP
