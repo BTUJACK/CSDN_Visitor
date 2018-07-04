@@ -385,6 +385,6 @@ class CSDNBlogVisitor():
 
 
 if __name__ == "__main__":
-    visitor = CSDNBlogVisitor(bolgger="gatieme")
-    # visitor.run()
-    visitor.viewer(VIEW_WITH_IMG=True)
+    visitor = CSDNBlogVisitor(bolgger="zyc121561")
+    visitor.run()
+    # visitor.viewer(VIEW_WITH_IMG=True)
