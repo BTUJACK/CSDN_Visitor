@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # @Author: yooongchun
-# @File: visit.py
+# @File: BlogVisitor.py
 # @Time: 2018/6/19
 # @Contact: yooongchun@foxmail.com
 # @blog: https://blog.csdn.net/zyc121561
@@ -15,8 +15,9 @@ import time
 from datetime import datetime
 import random
 import threading
-from multiprocessing import Process
 import re
+import types
+from enum import Enum
 from matplotlib import pyplot as plt
 import logging
 import config
@@ -40,19 +41,65 @@ class CSDNBlogVisitor():
         self.__proxy_database_name = proxy_database_name
         self.__info_database_name = info_database_name
         self.__RETRY_TIMES = 10
+        self.__proxy_ip = self.__update_ip()
+        ''' 休眠时间策略：
+        # INSTANT：1秒以内
+        # IMMEDIATE：1到5秒
+        # TEMPORARY：5到10秒，
+        # SHORT：10到60秒，
+        # MIDDLE：1分钟到10分钟，
+        # LONG：10分钟到一个小时，
+        # NIGHT：1个小时到3个小时
+        '''
+        self.__TYPE = Enum('TYPE', ('INSTANT', 'IMMEDIATE', 'TEMPORARY',
+                                    'SHORT', 'MIDDLE', 'LONG', 'NIGHT'))
+        '''访问策略
+        # RANDOM：随机访问
+        # MEAN：平均访问
+        # GAUSSIAN：高斯分布访问（根据现有访问量）
+        '''
+        self.__VISIT_STRATEGY = Enum('visit', ('RANDOM', 'MEAN', 'GAUSSIAN'))
 
-    def __random_ip(self):
-        ip = IP_Pool(self.__proxy_database_name, self.__table_name).pull(
-            random_flag=True, re_try_times=self.__RETRY_TIMES)
-        if ip is not None:
-            return str(ip[0]) + ":" + str(ip[1])
+    def __update_ip(self):
+        '''从数据库中获取IP地址'''
+        IPs = IP_Pool(self.__proxy_database_name,
+                      self.__table_name).pull(re_try_times=self.__RETRY_TIMES)
+        if IPs is not None and len(IPs) > 0:
+            logging.info(u"CSDNBlogVisitor:从数据库中更新代理IP...")
+            self.__proxy_ip = (ip for ip in IPs)
         else:
-            return None
+            logging.error(u"CSDNBlogVisitor:从数据库中更新代理IP出错！")
+            self.__proxy_ip = None
+
+    def __next_ip(self):
+        '''从数据库中获取IP地址,使用生成器进行循环获取'''
+        if isinstance(self.__proxy_ip, types.GeneratorType):
+            try:
+                ip = next(self.__proxy_ip)
+                return ip
+            except Exception:
+                self.__update_ip()
+            try:
+                ip = next(self.__proxy_ip)
+                return ip
+            except Exception:
+                return None
+        else:
+            self.__update_ip()
+            try:
+                ip = next(self.__proxy_ip)
+                return ip
+            except Exception:
+                return None
 
     def __proxies(self):
-        ip = self.__random_ip()
+        ip = self.__next_ip()
         if ip is not None:
-            proxies = {"http": "http://" + ip}
+            try:
+                IP = str(ip[0]) + ":" + str(ip[1])
+            except Exception:
+                return None
+            proxies = {"http": "http://" + IP}
             return proxies
         else:
             return None
@@ -85,16 +132,66 @@ class CSDNBlogVisitor():
             return None
         return INFO
 
+    def __sleep_strategy(self, TYPE):
+        '''休眠策略'''
+        if TYPE == self.__TYPE.INSTANT:
+            return 1 * random.random()
+        elif TYPE == self.__TYPE.IMMEDIATE:
+            return 1 + 4 * random.random()
+        elif TYPE == self.__TYPE.TEMPORARY:
+            return 5 + 5 * random.random()
+        elif TYPE == self.__TYPE.SHORT:
+            return 10 + 50 * random.random()
+        elif TYPE == self.__TYPE.MIDDLE:
+            return 60 + 540 * random.random()
+        elif TYPE == self.__TYPE.LONG:
+            return 600 + 3000 * random.random()
+        elif TYPE == self.__TYPE.NIGHT:
+            return 3600 + 7200 * random.random()
+        else:
+            return 0
+
+    def __visit_strategy(self, info, strategy):
+        '''访问策略:对不同文章根据其现有的访问量进行概率生成访问的url'''
+        # 计算访问的概率：根据其现有访问量计算
+        urls = [one['href'] for one in info]
+        nums = [int(one['read_num']) for one in info]
+        if strategy == self.__VISIT_STRATEGY.RANDOM:
+            return [random.choice(urls) for i in range(len(urls))]
+        elif strategy == self.__VISIT_STRATEGY.MEAN:
+            return urls
+        elif strategy == self.__VISIT_STRATEGY.GAUSSIAN:
+            '''轮盘法挑选'''
+            SUM = sum(nums)
+            d = [(url, num) for url, num in zip(urls, nums)]
+            d2 = sorted(d, key=lambda x: x[1])
+            nums = [one[1] for one in d2]
+            urls = [one[0] for one in d2]
+            P = [num / SUM for num in nums]
+            P2 = [sum(P[0:i + 1]) for i in range(len(P))]
+            URLs = []
+            for i in range(len(P)):
+                rp = random.random()
+                prep = P2[0]
+                for index, p in enumerate(P2):
+                    if rp > prep and rp <= p:
+                        URLs.append(urls[index])
+                    prep = p
+            return URLs
+        else:
+            return None
+
     def article_info(self):
         page_num = 0
         INFO = []
+        sleep = self.__sleep_strategy(self.__TYPE.IMMEDIATE)
         while True:
-            time.sleep(5 * random.random())
+            time.sleep(sleep)
             page_num += 1
             blog_page_link = "http://blog.csdn.net/{}/article/list/{}".format(
                 self.__bloger, page_num)
             logging.info(u"CSDNBlogVisitor:访问URL:{}".format(blog_page_link))
-            re_conn_times = 5
+            re_conn_times = 3
             headers = FakeUserAgent().random_headers()
             for i in range(re_conn_times):
                 try:
@@ -116,7 +213,7 @@ class CSDNBlogVisitor():
                 break
         return INFO
 
-    def visit(self, url, proxies):
+    def visitor(self, url, proxies):
         """访问url"""
         logging.info(u"CSDNBlogVisitor:访问URL:{}".format(url))
         headers = FakeUserAgent().random_headers()
@@ -143,44 +240,48 @@ class CSDNBlogVisitor():
             logging.info(u"CSDNBlogVisitor:访问URL失败，IP:{}".format(
                 proxies["http"].replace("http://", "")))
 
-    def multiple_thread_visit(self, info):
+    def multiple_visitor(self, info):
         """多线程访问"""
         thread_pool = []
-        urls = [one['href'] for one in info]
-        proxies = self.__proxies()
+        urls = self.__visit_strategy(info, self.__VISIT_STRATEGY.GAUSSIAN)
         for i in range(len(urls)):
             logging.info(u"CSDNBlogVisitor:进度：{}/{}\t{:.2f}%".format(
                 i + 1, len(urls), (i + 1) / len(urls) * 100))
             if i % 10 == 0:
                 proxies = self.__proxies()
-            thr = threading.Thread(target=self.visit, args=(urls[i], proxies))
+            thr = threading.Thread(
+                target=self.visitor, args=(urls[i], proxies))
             thr.start()
-            time.sleep(random.random() * 5)
+            sleep = self.__sleep_strategy(self.__TYPE.SHORT)
+            time.sleep(sleep)
             thread_pool.append(thr)
         for thr in thread_pool:
             thr.join()
 
     def run(self):
-        p = Process(target=self.save)
+        p = threading.Thread(target=self.saver)
         p.start()
         cnt = 0
         while True:
             cnt += 1
             st = time.time()
             logging.info(u"CSDNBlogVisitor:开始第{}轮访问！".format(cnt))
-            info = self.article_info()
+            if cnt == 1:
+                info = self.article_info()
             if info is None or len(info) < 1:
                 logging.info(u"CSDNBlogVisitor:获取文章信息出错，跳过！")
-                time.sleep(5 * random.random())
+                sleep = self.__sleep_strategy(self.__TYPE.TEMPORARY)
+                time.sleep(sleep)
                 continue
             READNUM_A = sum([one['read_num'] for one in info])
             logging.info(u"CSDNBlogVisitor:当前统计文章数：{}\t文章总访问次数：{}".format(
                 len(info), READNUM_A))
-            self.multiple_thread_visit(info)
+            self.multiple_visitor(info)
             info = self.article_info()
             if info is None or len(info) < 1:
                 logging.info(u"CSDNBlogVisitor:获取统计信息出错!")
-                time.sleep(5 * random.random())
+                sleep = self.__sleep_strategy(self.__TYPE.IMMEDIATE)
+                time.sleep(sleep)
                 continue
             READNUM_B = sum([one['read_num'] for one in info])
             logging.info(
@@ -189,15 +290,15 @@ class CSDNBlogVisitor():
                        time.time() - st, len(info), READNUM_B,
                        int(READNUM_B - READNUM_A)))
             st = time.time()
-            sleep = 60 * random.random()
+            sleep = self.__sleep_strategy(self.__TYPE.MIDDLE)
             while time.time() - st < sleep:
                 logging.info(u"CSDNBlogVisitor:随机休眠剩余时间：{:.2f} 秒".format(
                     sleep - time.time() + st))
                 time.sleep(1)
         p.join()
 
-    def __plot(self, info):
-        '''绘制图表'''
+    def __plotter(self, info):
+        '''绘制文章访问频率图表'''
         logging.info(u"CSDNBlogVisitor:绘制访问信息统计图...")
         cnt = []
         IDs = []
@@ -206,12 +307,36 @@ class CSDNBlogVisitor():
                 cnt.append(one['read_num'])
                 IDs.append(one['id'])
         plt.figure("CSDN Visitor Counter Viewer")
+        plt.subplot(211)
         plt.bar(range(len(IDs)), cnt)
-        plt.xticks(rotation=60, fontsize=10)
+        plt.xticks(rotation=60)
         plt.xticks(range(len(IDs)), IDs)
         plt.xlabel("Article ID")
         plt.ylabel("Visitor Number")
-        plt.title("Visitor numver--Article ID figure")
+        plt.title("Visitor Number--Article ID Figure")
+
+        READNUM = INFO_Pool(self.__info_database_name,
+                            self.__info_table_name).pull()
+        if READNUM is None or len(READNUM) < 1:
+            logging.info(u"CSDNBlogVisitor:没有保存信息...")
+        else:
+            time = [num[0] for num in READNUM]
+            id_num = [num[2] for num in READNUM]
+            num = [num[3] for num in READNUM]
+
+            plt.subplot(223)
+            plt.plot(id_num)
+            plt.xticks(rotation=60)
+            plt.xticks(range(len(time)), time)
+            plt.xlabel("Time")
+            plt.ylabel("Article Number")
+
+            plt.subplot(224)
+            plt.plot(num)
+            plt.xticks(rotation=60)
+            plt.xticks(range(len(time)), time)
+            plt.xlabel("Time")
+            plt.ylabel("Visitor Number")
         plt.show()
 
     def viewer(self, VIEW_WITH_IMG=False):
@@ -223,9 +348,9 @@ class CSDNBlogVisitor():
         logging.info(u"CSDNBlogVisitor:统计时间：{}\t统计文章数：{}\t总计访问量：{}".format(
             datetime.now(), len(info), sum([one['read_num'] for one in info])))
         if VIEW_WITH_IMG:
-            self.__plot(info)
+            self.__plotter(info)
 
-    def save(self, time_step=1 * 60 * 60):
+    def saver(self, time_step=1 * 60 * 60):
         '''保存统计数据到数据库'''
         while True:
             logging.info(u"CSDNBlogVisitor-save:保存统计信息...")
@@ -236,7 +361,8 @@ class CSDNBlogVisitor():
                     break
                 else:
                     info = None
-                    time.sleep(10)
+                    sleep = self.__sleep_strategy(self.__TYPE.SHORT)
+                    time.sleep(sleep)
             if info is None:
                 logging.error(u"CSDNBlogVisitor-save:获取信息出错！")
                 logging.info(u"CSDNBlogVisitor-save:休眠中...")
@@ -259,6 +385,6 @@ class CSDNBlogVisitor():
 
 
 if __name__ == "__main__":
-
-    visitor = CSDNBlogVisitor()
-    visitor.run()
+    visitor = CSDNBlogVisitor(bolgger="gatieme")
+    # visitor.run()
+    visitor.viewer(VIEW_WITH_IMG=True)

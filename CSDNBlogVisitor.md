@@ -41,7 +41,7 @@ Email：yooongchun@foxmail.com
     INFO:root:CSDNBlogVisitor:绘制访问信息统计图...
     ```
 
-    ![viewer](viewer.png)
+    ![viewer](CSDN_Visitor_Counter_Viewer.png)
 
   - 自动访问只需启动`run` 函数：
 
@@ -72,6 +72,10 @@ Email：yooongchun@foxmail.com
     INFO:root:CSDNBlogVisitor:随机休眠剩余时间：22.48 秒
     ...
     ```
+
+- 程序主模块框架示意图：`BlogVisitor` 类内的函数调用关系及其与其余模块交互示意如下
+
+  ![](BlogVisitor.png)
 
 - 程序主要框架：包含了5个模块。各个模块说明如下：
 

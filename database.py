@@ -211,7 +211,7 @@ class INFO_Pool(object):
 
 
 if __name__ == "__main__":
-    pool = INFO_Pool("IP.db", "ip_table")
+    pool = INFO_Pool("INFO.db", "info_table")
     for ip in pool.pull():
         logging.info(ip)
 
