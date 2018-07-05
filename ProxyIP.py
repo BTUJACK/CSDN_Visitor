@@ -352,8 +352,8 @@ class Validation(object):
 
     def run(self):
         '''启动程序'''
-        p1 = Process(target=self.multiple_filter)
-        p2 = Process(target=self.multiple_validation)
+        p1 = threading.Thread(target=self.multiple_filter)
+        p2 = threading.Thread(target=self.multiple_validation)
         p1.start()
         p2.start()
         p1.join()
@@ -363,13 +363,10 @@ class Validation(object):
 def main():
     # 初始化
     crawl = Crawl()
-    validation = Validation()
     p1 = Process(target=crawl.run)
-    p2 = Process(target=validation.run)
     p1.start()
-    p2.start()
+    Validation().run()
     p1.join()
-    p2.join()
 
 
 if __name__ == "__main__":

@@ -151,7 +151,7 @@ class CSDNBlogVisitor():
         else:
             return 0
 
-    def __visit_strategy(self, info, strategy):
+    def __visit_strategy_container(self, info, strategy):
         '''访问策略:对不同文章根据其现有的访问量进行概率生成访问的url'''
         # 计算访问的概率：根据其现有访问量计算
         urls = [one['href'] for one in info]
@@ -180,6 +180,23 @@ class CSDNBlogVisitor():
             return URLs
         else:
             return None
+
+    def __visit_strategy(self, info):
+        '''生成访问策略
+        # 不同访问策略选中的概率分别为：
+        # MEAN ：0.3
+        # RANDOM：0.3
+        # GAUSSIAN：0.4
+        '''
+        while True:
+            p = random.random()
+            if p > 0.7:
+                STRATEGY = self.__VISIT_STRATEGY.MEAN
+            elif p > 0.4:
+                STRATEGY = self.__VISIT_STRATEGY.RANDOM
+            else:
+                STRATEGY = self.__VISIT_STRATEGY.GAUSSIAN
+            yield self.__visit_strategy_container(info, STRATEGY)
 
     def article_info(self):
         page_num = 0
@@ -243,7 +260,7 @@ class CSDNBlogVisitor():
     def multiple_visitor(self, info):
         """多线程访问"""
         thread_pool = []
-        urls = self.__visit_strategy(info, self.__VISIT_STRATEGY.GAUSSIAN)
+        urls = list(self.__visit_strategy(info))
         for i in range(len(urls)):
             logging.info(u"CSDNBlogVisitor:进度：{}/{}\t{:.2f}%".format(
                 i + 1, len(urls), (i + 1) / len(urls) * 100))
