@@ -243,7 +243,7 @@ class CSDNBlogVisitor():
     def multiple_visitor(self, info):
         """多线程访问"""
         thread_pool = []
-        urls = self.__visit_strategy(info, self.__VISIT_STRATEGY.GAUSSIAN)
+        urls = self.__visit_strategy(info, self.__VISIT_STRATEGY.RANDOM)
         for i in range(len(urls)):
             logging.info(u"CSDNBlogVisitor:进度：{}/{}\t{:.2f}%".format(
                 i + 1, len(urls), (i + 1) / len(urls) * 100))
