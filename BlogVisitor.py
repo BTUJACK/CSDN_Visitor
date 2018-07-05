@@ -184,7 +184,7 @@ class CSDNBlogVisitor():
     def article_info(self):
         page_num = 0
         INFO = []
-        sleep = self.__sleep_strategy(self.__TYPE.IMMEDIATE)
+        sleep = self.__sleep_strategy(self.__TYPE.IMMEDIATE) * 0.7
         while True:
             time.sleep(sleep)
             page_num += 1
@@ -252,7 +252,7 @@ class CSDNBlogVisitor():
             thr = threading.Thread(
                 target=self.visitor, args=(urls[i], proxies))
             thr.start()
-            sleep = self.__sleep_strategy(self.__TYPE.SHORT)
+            sleep = self.__sleep_strategy(self.__TYPE.SHORT) * 0.7
             time.sleep(sleep)
             thread_pool.append(thr)
         for thr in thread_pool:
@@ -270,7 +270,7 @@ class CSDNBlogVisitor():
                 info = self.article_info()
             if info is None or len(info) < 1:
                 logging.info(u"CSDNBlogVisitor:获取文章信息出错，跳过！")
-                sleep = self.__sleep_strategy(self.__TYPE.TEMPORARY)
+                sleep = self.__sleep_strategy(self.__TYPE.TEMPORARY) * 0.7
                 time.sleep(sleep)
                 continue
             READNUM_A = sum([one['read_num'] for one in info])
@@ -280,7 +280,7 @@ class CSDNBlogVisitor():
             info = self.article_info()
             if info is None or len(info) < 1:
                 logging.info(u"CSDNBlogVisitor:获取统计信息出错!")
-                sleep = self.__sleep_strategy(self.__TYPE.IMMEDIATE)
+                sleep = self.__sleep_strategy(self.__TYPE.IMMEDIATE) * 0.7
                 time.sleep(sleep)
                 continue
             READNUM_B = sum([one['read_num'] for one in info])
@@ -290,7 +290,7 @@ class CSDNBlogVisitor():
                        time.time() - st, len(info), READNUM_B,
                        int(READNUM_B - READNUM_A)))
             st = time.time()
-            sleep = self.__sleep_strategy(self.__TYPE.MIDDLE)
+            sleep = self.__sleep_strategy(self.__TYPE.MIDDLE) * 0.7
             while time.time() - st < sleep:
                 logging.info(u"CSDNBlogVisitor:随机休眠剩余时间：{:.2f} 秒".format(
                     sleep - time.time() + st))
@@ -361,7 +361,7 @@ class CSDNBlogVisitor():
                     break
                 else:
                     info = None
-                    sleep = self.__sleep_strategy(self.__TYPE.SHORT)
+                    sleep = self.__sleep_strategy(self.__TYPE.SHORT) * 0.7
                     time.sleep(sleep)
             if info is None:
                 logging.error(u"CSDNBlogVisitor-save:获取信息出错！")
@@ -386,5 +386,5 @@ class CSDNBlogVisitor():
 
 if __name__ == "__main__":
     visitor = CSDNBlogVisitor(bolgger="zyc121561")
-    visitor.run()
-    # visitor.viewer(VIEW_WITH_IMG=True)
+    # visitor.run()
+    visitor.viewer(VIEW_WITH_IMG=True)
