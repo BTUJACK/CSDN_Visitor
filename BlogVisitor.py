@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from UA import FakeUserAgent
 from database import IP_Pool, INFO_Pool
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import random
 import threading
 import re
@@ -41,6 +41,7 @@ class CSDNBlogVisitor():
         self.__proxy_database_name = proxy_database_name
         self.__info_database_name = info_database_name
         self.__RETRY_TIMES = 10
+        self.__sleep_factor = 0.5
         self.__proxy_ip = self.__update_ip()
         ''' 休眠时间策略：
         # INSTANT：1秒以内
@@ -151,7 +152,7 @@ class CSDNBlogVisitor():
         else:
             return 0
 
-    def __visit_strategy(self, info, strategy):
+    def __visit_strategy_container(self, info, strategy):
         '''访问策略:对不同文章根据其现有的访问量进行概率生成访问的url'''
         # 计算访问的概率：根据其现有访问量计算
         urls = [one['href'] for one in info]
@@ -181,10 +182,27 @@ class CSDNBlogVisitor():
         else:
             return None
 
+    def __visit_strategy(self, info):
+        '''生成访问策略
+        # 不同访问策略选中的概率分别为：
+        # MEAN ：0.3
+        # RANDOM：0.3
+        # GAUSSIAN：0.4
+        '''
+        p = random.random()
+        if p > 0.7:
+            STRATEGY = self.__VISIT_STRATEGY.MEAN
+        elif p > 0.4:
+            STRATEGY = self.__VISIT_STRATEGY.RANDOM
+        else:
+            STRATEGY = self.__VISIT_STRATEGY.GAUSSIAN
+        return self.__visit_strategy_container(info, STRATEGY)
+
     def article_info(self):
         page_num = 0
         INFO = []
-        sleep = self.__sleep_strategy(self.__TYPE.IMMEDIATE) * 0.7
+        sleep = self.__sleep_strategy(
+            self.__TYPE.IMMEDIATE) * self.__sleep_factor
         while True:
             time.sleep(sleep)
             page_num += 1
@@ -243,7 +261,7 @@ class CSDNBlogVisitor():
     def multiple_visitor(self, info):
         """多线程访问"""
         thread_pool = []
-        urls = self.__visit_strategy(info, self.__VISIT_STRATEGY.RANDOM)
+        urls = self.__visit_strategy(info)
         for i in range(len(urls)):
             logging.info(u"CSDNBlogVisitor:进度：{}/{}\t{:.2f}%".format(
                 i + 1, len(urls), (i + 1) / len(urls) * 100))
@@ -252,7 +270,8 @@ class CSDNBlogVisitor():
             thr = threading.Thread(
                 target=self.visitor, args=(urls[i], proxies))
             thr.start()
-            sleep = self.__sleep_strategy(self.__TYPE.SHORT) * 0.7
+            sleep = self.__sleep_strategy(
+                self.__TYPE.SHORT) * self.__sleep_factor
             time.sleep(sleep)
             thread_pool.append(thr)
         for thr in thread_pool:
@@ -270,7 +289,8 @@ class CSDNBlogVisitor():
                 info = self.article_info()
             if info is None or len(info) < 1:
                 logging.info(u"CSDNBlogVisitor:获取文章信息出错，跳过！")
-                sleep = self.__sleep_strategy(self.__TYPE.TEMPORARY) * 0.7
+                sleep = self.__sleep_strategy(
+                    self.__TYPE.TEMPORARY) * self.__sleep_factor
                 time.sleep(sleep)
                 continue
             READNUM_A = sum([one['read_num'] for one in info])
@@ -280,7 +300,8 @@ class CSDNBlogVisitor():
             info = self.article_info()
             if info is None or len(info) < 1:
                 logging.info(u"CSDNBlogVisitor:获取统计信息出错!")
-                sleep = self.__sleep_strategy(self.__TYPE.IMMEDIATE) * 0.7
+                sleep = self.__sleep_strategy(
+                    self.__TYPE.IMMEDIATE) * self.__sleep_factor
                 time.sleep(sleep)
                 continue
             READNUM_B = sum([one['read_num'] for one in info])
@@ -290,7 +311,8 @@ class CSDNBlogVisitor():
                        time.time() - st, len(info), READNUM_B,
                        int(READNUM_B - READNUM_A)))
             st = time.time()
-            sleep = self.__sleep_strategy(self.__TYPE.MIDDLE) * 0.7
+            sleep = self.__sleep_strategy(
+                self.__TYPE.MIDDLE) * self.__sleep_factor
             while time.time() - st < sleep:
                 logging.info(u"CSDNBlogVisitor:随机休眠剩余时间：{:.2f} 秒".format(
                     sleep - time.time() + st))
@@ -361,7 +383,8 @@ class CSDNBlogVisitor():
                     break
                 else:
                     info = None
-                    sleep = self.__sleep_strategy(self.__TYPE.SHORT) * 0.7
+                    sleep = self.__sleep_strategy(
+                        self.__TYPE.SHORT) * self.__sleep_factor
                     time.sleep(sleep)
             if info is None:
                 logging.error(u"CSDNBlogVisitor-save:获取信息出错！")
@@ -371,8 +394,11 @@ class CSDNBlogVisitor():
             try:
                 total_read = sum([one['read_num'] for one in info])
                 article_num = len(info)
+                # 将时间转换为北京时间
+                utc_dt = datetime.utcnow().replace(tzinfo=timezone.utc)
+                bj_dt = utc_dt.astimezone(timezone(timedelta(hours=8)))
                 INFO = [
-                    str(datetime.now()).split(".")[0],
+                    str(bj_dt).split(".")[0],
                     time.time(), article_num, total_read
                 ]
                 INFO_Pool(self.__info_database_name,
@@ -386,5 +412,5 @@ class CSDNBlogVisitor():
 
 if __name__ == "__main__":
     visitor = CSDNBlogVisitor(bolgger="zyc121561")
-    # visitor.run()
-    visitor.viewer(VIEW_WITH_IMG=True)
+    visitor.run()
+    # visitor.viewer(VIEW_WITH_IMG=True)
