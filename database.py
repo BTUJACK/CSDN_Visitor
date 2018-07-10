@@ -9,52 +9,37 @@
 
 import sqlite3
 import time
-import logging
-import config
-config.config()
 
 
-class IP_Pool(object):
-    """
-    存取IP的数据库
-    """
+class IPPool(object):
+    """存取IP的数据库"""
 
-    def __init__(self, database_name, table_name):
-        self.__table_name = table_name
+    def __init__(self, database_name):
+        self.__table_name = "ip_table"
         self.__database_name = database_name
 
-    def __push(self, IP_list):
+    def __push(self, ip):
         '''存储IP，传入一个列表，格式为[[IP,PORT,ADDRESS,TYPE,PROTOCOL],...]'''
-        logging.info(u"database-IP_Pool:写入数据库表：%s..." % (self.__table_name))
-        try:
-            conn = sqlite3.connect(self.__database_name, isolation_level=None)
+        conn = sqlite3.connect(self.__database_name, isolation_level=None)
+        conn.execute(
+            "create table if not exists %s(IP CHAR(20) UNIQUE, PORT INTEGER,ADDRESS CHAR(50),TYPE CHAR(50),PROTOCOL CHAR(50))"
+            % self.__table_name)
+        for one in ip:
             conn.execute(
-                "create table if not exists %s(IP CHAR(20) UNIQUE, PORT INTEGER,ADDRESS CHAR(50),TYPE CHAR(50),PROTOCOL CHAR(50))"
-                % self.__table_name)
-        except Exception:
-            logging.error(u"database-IP_Pool:连接数据库出错,退出：{}".format(
-                self.__database_name))
-            return
-        for one in IP_list:
-            if len(one) < 5:
-                logging.error(u"database-IP_Pool:IP格式不正确：{}，跳过！".format(one))
-                continue
-            conn.execute(
-                "insert or ignore into %s(IP,PORT,ADDRESS,TYPE,PROTOCOL) values (?,?,?,?,?)"
-                % (self.__table_name),
+                "insert or ignore into %s(IP,PORT,ADDRESS,TYPE,PROTOCOL) values (?,?,?,?,?)" % (self.__table_name),
                 (one[0], one[1], one[2], one[3], one[4]))
         conn.commit()
         conn.close()
 
-    def push(self, IP_list, re_try_times=1):
+    def push(self, ip, re_try_times=1):
         '''保存数据到数据库，为应对多线程，多进程的并发访问，采用多次重试模式'''
-        if not isinstance(IP_list, list):
-            return False
+        if not isinstance(ip, list):
+            return
         if not isinstance(re_try_times, int) or re_try_times < 1:
             re_try_times = 1
         for i in range(re_try_times):
             try:
-                self.__push(IP_list)
+                self.__push(ip)
                 return True
             except Exception:
                 time.sleep(0.05)
@@ -63,19 +48,13 @@ class IP_Pool(object):
 
     def __pull(self, random_flag=False):
         '''获取IP，返回一个列表'''
-        try:
-            conn = sqlite3.connect(self.__database_name, isolation_level=None)
-            conn.execute(
-                "create table if not exists %s(IP CHAR(20) UNIQUE, PORT INTEGER,ADDRESS CHAR(50),TYPE CHAR(50),PROTOCOL CHAR(50))"
-                % self.__table_name)
-        except Exception:
-            logging.error(u"database-IP_Pool:连接数据库出错：{}".format(
-                self.__database_name))
-            return
+        conn = sqlite3.connect(self.__database_name, isolation_level=None)
+        conn.execute(
+            "create table if not exists %s(IP CHAR(20) UNIQUE, PORT INTEGER,ADDRESS CHAR(50),TYPE CHAR(50),PROTOCOL CHAR(50))"
+            % self.__table_name)
         cur = conn.cursor()
         if random_flag:
-            cur.execute("select * from %s order by random() limit 1" %
-                        self.__table_name)
+            cur.execute("select * from %s order by random() limit 1" % self.__table_name)
             response = cur.fetchone()
         else:
             cur.execute("select * from %s" % self.__table_name)
@@ -101,24 +80,15 @@ class IP_Pool(object):
 
     def __delete(self, IP=None):
         '''删除指定的记录'''
-        try:
-            conn = sqlite3.connect(self.__database_name, isolation_level=None)
-            conn.execute(
-                "create table if not exists %s(IP CHAR(20) UNIQUE, PORT INTEGER,ADDRESS CHAR(50),TYPE CHAR(50),PROTOCOL CHAR(50))"
-                % self.__table_name)
-        except Exception:
-            logging.error(u"database-IP_Pool:连接数据库出错：{}".format(
-                self.__database_name))
-            return
+        conn = sqlite3.connect(self.__database_name, isolation_level=None)
+        conn.execute(
+            "create table if not exists %s(IP CHAR(20) UNIQUE, PORT INTEGER,ADDRESS CHAR(50),TYPE CHAR(50),PROTOCOL CHAR(50))"
+            % self.__table_name)
         cur = conn.cursor()
         if IP is not None:
-            logging.info(u"database-IP_Pool:删除记录：{}\t{}".format(
-                self.__table_name, IP[0]))
             cur.execute("delete from %s where IP=?" % self.__table_name,
-                        (IP[0], ))
+                        (IP[0],))
         else:
-            logging.info(u"database-IP_Pool:删除所有记录:{}".format(
-                self.__table_name))
             cur.execute("delete from %s" % self.__table_name)
         cur.close()
         conn.close()
@@ -139,33 +109,38 @@ class IP_Pool(object):
         return False
 
 
-class INFO_Pool(object):
+class InfoPool(object):
     """
     存取博客文章统计数据的数据库
     """
 
-    def __init__(self, database_name, table_name):
-        self.__table_name = table_name
+    def __init__(self, database_name):
+        self.__table_name = "info_table"
         self.__database_name = database_name
 
     def push(self, info):
-        '''存储统计信息，传入一个列表，格式为[[TIME,TISTAMP,ARTICLE_NUM,TOTAL_VISIT],...]'''
-        logging.info(u"database-INFO_Pool:写入数据库表：%s..." % (self.__table_name))
+        '''存储统计信息，传入一个列表，格式为[[TIME,TIMESTAMP,ARTICLE_NUM,TOTAL_VISIT],...]'''
+        if not isinstance(info, list) or len(info) < 1:
+            return
         try:
             conn = sqlite3.connect(self.__database_name, isolation_level=None)
             conn.execute(
                 "create table if not exists %s(TIME CHAR(50) UNIQUE,TIMESTAMP INTEGER,ARTICLE_NUM INTEGER,TOTAL_VISIT INTEGER)"
                 % self.__table_name)
         except Exception:
-            logging.error(u"database-INFO_Pool:连接数据库出错,退出：{}".format(
-                self.__table_name))
-            return
+            return False
         for one in info:
-            conn.execute(
-                "insert or ignore into %s(TIME,TIMESTAMP,ARTICLE_NUM,TOTAL_VISIT) values (?,?,?,?)"
-                % (self.__table_name), (one[0], one[1], one[2], one[3]))
+            if len(one) < 4:
+                continue
+            try:
+                conn.execute(
+                    "insert or ignore into %s(TIME,TIMESTAMP,ARTICLE_NUM,TOTAL_VISIT) values (?,?,?,?)" % (
+                        self.__table_name), (one[0], one[1], one[2], one[3]))
+            except Exception:
+                continue
         conn.commit()
         conn.close()
+        return True
 
     def pull(self):
         '''获取数据库内容，返回一个列表'''
@@ -175,14 +150,15 @@ class INFO_Pool(object):
                 "create table if not exists %s(TIME CHAR(50) UNIQUE,TIMESTAMP INTEGER,ARTICLE_NUM INTEGER,TOTAL_VISIT INTEGER)"
                 % self.__table_name)
         except Exception:
-            logging.error(u"database-INFO_Pool:连接数据库出错：{}".format(
-                self.__table_name))
             return
-        cur = conn.cursor()
-        cur.execute("select * from %s" % self.__table_name)
-        response = cur.fetchall()
-        cur.close()
-        conn.close()
+        try:
+            cur = conn.cursor()
+            cur.execute("select * from %s" % self.__table_name)
+            response = cur.fetchall()
+            cur.close()
+            conn.close()
+        except Exception:
+            return False
         return response
 
     def delete(self, TIME=None):
@@ -193,26 +169,56 @@ class INFO_Pool(object):
                 "create table if not exists %s(TIME CHAR(50) UNIQUE,TIMESTAMP INTEGER,ARTICLE_NUM INTEGER,TOTAL_VISIT INTEGER)"
                 % self.__table_name)
         except Exception:
-            logging.error(u"database-INFO_Pool:连接数据库出错：{}".format(
-                self.__table_name))
             return
         cur = conn.cursor()
         if TIME is not None:
-            logging.info(u"database-INFO_Pool:删除记录：{}-{}".format(
-                self.__table_name, TIME))
-            cur.execute("delete from %s where TIME=?" % self.__table_name,
-                        (TIME, ))
+            try:
+                cur.execute("delete from %s where TIME=?" % self.__table_name, (TIME,))
+            except Exception:
+                return False
         else:
-            logging.info(u"database-INFO_Pool:删除所有记录:{}".format(
-                self.__table_name))
-            cur.execute("delete from %s" % self.__table_name)
+            try:
+                cur.execute("delete from %s" % self.__table_name)
+            except Exception:
+                return False
         cur.close()
         conn.close()
+        return True
 
 
 if __name__ == "__main__":
-    pool = INFO_Pool("INFO.db", "info_table")
-    for ip in pool.pull():
-        logging.info(ip)
+    pool = IPPool("IP.db")
+    ip = [['127.0.0.1', 8080, 'addr', 'niming', 'HTTP'],
+          ['127.0.0.2', 8080, 'addr', 'niming', 'HTTP'],
+          ['127.0.0.3', 8080, 'addr', 'niming', 'HTTP'],
+          ['127.0.0.4', 8080, 'addr', 'niming', 'HTTP']]
+    status = pool.push(ip)
+    print(status)
 
-    print(len(pool.pull()))
+    for ip in pool.pull():
+        print(ip)
+    print("-.-" * 20)
+    pool.delete(IP=['127.0.0.1', 8080, 'addr', 'niming', 'HTTP'])
+    for ip in pool.pull():
+        print(ip)
+
+    pool = InfoPool("INFO.db")
+    ip = [['2018-07-10-23:40:04', 1527900, 1000, 30192],
+          ['2018-07-10-23:40:05', 1527900, 1000, 30192],
+          ['2018-07-10-23:40:06', 1527900, 1000, 30192],
+          ['2018-07-10-23:40:07', 1527900, 1000, 30192],
+          ['2018-07-10-23:40:08', 1527900, 1000, 30192]]
+    status = pool.push(ip)
+    print(status)
+
+    for ip in pool.pull():
+        print(ip)
+    print("-.-" * 20)
+    pool.delete(TIME='2018-07-10-23:40:04')
+    for ip in pool.pull():
+        print(ip)
+
+    pool = IPPool("IP.db")
+    for index, ip in enumerate(pool.pull()):
+        print(index, ip)
+    print("-.-" * 20)

@@ -10,7 +10,7 @@
 import requests
 from bs4 import BeautifulSoup
 from UA import FakeUserAgent
-from database import IP_Pool, INFO_Pool
+from database import IPPool, InfoPool
 import time
 from datetime import datetime, timedelta, timezone
 import random
@@ -21,7 +21,8 @@ from enum import Enum
 from matplotlib import pyplot as plt
 import logging
 import config
-config.config()
+
+config.CONFIG(to_file=True, level="ERROR", file_path="blogger.log")
 
 
 class CSDNBlogVisitor():
@@ -36,8 +37,6 @@ class CSDNBlogVisitor():
                  info_database_name="../INFO.db"):
         self.__bloger = bolgger
         self.__host = "blog.csdn.net"
-        self.__table_name = "ip_table"
-        self.__info_table_name = "info_table"
         self.__proxy_database_name = proxy_database_name
         self.__info_database_name = info_database_name
         self.__RETRY_TIMES = 10
@@ -52,19 +51,17 @@ class CSDNBlogVisitor():
         # LONG：10分钟到一个小时，
         # NIGHT：1个小时到3个小时
         '''
-        self.__TYPE = Enum('TYPE', ('INSTANT', 'IMMEDIATE', 'TEMPORARY',
-                                    'SHORT', 'MIDDLE', 'LONG', 'NIGHT'))
+        self.__TYPE = Enum("TYPE", ('INSTANT', 'IMMEDIATE', 'TEMPORARY', 'SHORT', 'MIDDLE', 'LONG', 'NIGHT'))
         '''访问策略
         # RANDOM：随机访问
         # MEAN：平均访问
         # GAUSSIAN：高斯分布访问（根据现有访问量）
         '''
-        self.__VISIT_STRATEGY = Enum('visit', ('RANDOM', 'MEAN', 'GAUSSIAN'))
+        self.__VISIT_STRATEGY = Enum("VISITOR", ('RANDOM', 'MEAN', 'GAUSSIAN'))
 
     def __update_ip(self):
         '''从数据库中获取IP地址'''
-        IPs = IP_Pool(self.__proxy_database_name,
-                      self.__table_name).pull(re_try_times=self.__RETRY_TIMES)
+        IPs = IPPool(self.__proxy_database_name).pull(re_try_times=self.__RETRY_TIMES)
         if IPs is not None and len(IPs) > 0:
             logging.info(u"CSDNBlogVisitor:从数据库中更新代理IP...")
             self.__proxy_ip = (ip for ip in IPs)
@@ -211,13 +208,13 @@ class CSDNBlogVisitor():
             logging.info(u"CSDNBlogVisitor:访问URL:{}".format(blog_page_link))
             re_conn_times = 3
             headers = FakeUserAgent().random_headers()
+            response = None
             for i in range(re_conn_times):
                 try:
                     response = requests.get(
                         url=blog_page_link, headers=headers, timeout=5)
                     break
                 except Exception:
-                    response = None
                     continue
             if response is None:
                 logging.info(u"CSDNBlogVisitor:访问url出错：%s" % blog_page_link)
@@ -239,6 +236,7 @@ class CSDNBlogVisitor():
             logging.error(u"CSDNBlogVisitor:没有代理IP，退出当前访问！")
             return
         re_conn_times = 3
+        code = None
         for i in range(re_conn_times):
             try:
                 code = requests.get(
@@ -247,7 +245,7 @@ class CSDNBlogVisitor():
                 if int(code) == 200:
                     break
             except Exception:
-                code = None
+                continue
         if code is None:
             logging.info(u"CSDNBlogVisitor:访问url出错：%s" % url)
             return
@@ -263,7 +261,7 @@ class CSDNBlogVisitor():
         thread_pool = []
         urls = self.__visit_strategy(info)
         for i in range(len(urls)):
-            logging.info(u"CSDNBlogVisitor:进度：{}/{}\t{:.2f}%".format(
+            logging.info(u"CSDNBlogVisitor:进度：{}/{} \t{:.2f}%".format(
                 i + 1, len(urls), (i + 1) / len(urls) * 100))
             if i % 10 == 0:
                 proxies = self.__proxies()
@@ -307,9 +305,9 @@ class CSDNBlogVisitor():
             READNUM_B = sum([one['read_num'] for one in info])
             logging.info(
                 u"CSDNBlogVisitor:完成第{}轮访问，耗时：{:.2f}秒\n当前统计文章数：{}\t文章总访问次数：{}\t本轮有效访问次数：{}".
-                format(cnt,
-                       time.time() - st, len(info), READNUM_B,
-                       int(READNUM_B - READNUM_A)))
+                    format(cnt,
+                           time.time() - st, len(info), READNUM_B,
+                           int(READNUM_B - READNUM_A)))
             st = time.time()
             sleep = self.__sleep_strategy(
                 self.__TYPE.MIDDLE) * self.__sleep_factor
@@ -317,7 +315,6 @@ class CSDNBlogVisitor():
                 logging.info(u"CSDNBlogVisitor:随机休眠剩余时间：{:.2f} 秒".format(
                     sleep - time.time() + st))
                 time.sleep(1)
-        p.join()
 
     def __plotter(self, info):
         '''绘制文章访问频率图表'''
@@ -337,8 +334,7 @@ class CSDNBlogVisitor():
         plt.ylabel("Visitor Number")
         plt.title("Visitor Number--Article ID Figure")
 
-        READNUM = INFO_Pool(self.__info_database_name,
-                            self.__info_table_name).pull()
+        READNUM = InfoPool(self.__info_database_name).pull()
         if READNUM is None or len(READNUM) < 1:
             logging.info(u"CSDNBlogVisitor:没有保存信息...")
         else:
@@ -401,8 +397,7 @@ class CSDNBlogVisitor():
                     str(bj_dt).split(".")[0],
                     time.time(), article_num, total_read
                 ]
-                INFO_Pool(self.__info_database_name,
-                          self.__info_table_name).push([INFO])
+                InfoPool(self.__info_database_name).push([INFO])
             except Exception:
                 logging.error(u"CSDNBlogVisitor-save:信息统计出错！")
             finally:

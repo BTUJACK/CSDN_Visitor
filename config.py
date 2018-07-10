@@ -13,7 +13,7 @@ import logging.handlers
 class CONFIG(object):
     '''控制信息打印级别和位置'''
 
-    def __init__(self, to_file=False, level="info", file_path="blogger.log"):
+    def __init__(self, to_file=False, level="INFO", file_path="blogger.log"):
         if level == "FATAL":
             logging_level = logging.FATAL
         elif level == "ERROR":
