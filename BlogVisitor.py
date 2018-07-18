@@ -22,7 +22,7 @@ from matplotlib import pyplot as plt
 import logging
 import config
 
-config.CONFIG(to_file=True, level="ERROR", file_path="blogger.log")
+config.config()
 
 
 class CSDNBlogVisitor():
@@ -34,13 +34,14 @@ class CSDNBlogVisitor():
     def __init__(self,
                  bolgger="zyc121561",
                  proxy_database_name="IP.db",
-                 info_database_name="../INFO.db"):
+                 info_database_name="../INFO.db",
+                 sleep_factor=0.1):
         self.__bloger = bolgger
         self.__host = "blog.csdn.net"
         self.__proxy_database_name = proxy_database_name
         self.__info_database_name = info_database_name
         self.__RETRY_TIMES = 10
-        self.__sleep_factor = 0.5
+        self.__sleep_factor = sleep_factor
         self.__proxy_ip = self.__update_ip()
         ''' 休眠时间策略：
         # INSTANT：1秒以内
@@ -51,7 +52,8 @@ class CSDNBlogVisitor():
         # LONG：10分钟到一个小时，
         # NIGHT：1个小时到3个小时
         '''
-        self.__TYPE = Enum("TYPE", ('INSTANT', 'IMMEDIATE', 'TEMPORARY', 'SHORT', 'MIDDLE', 'LONG', 'NIGHT'))
+        self.__TYPE = Enum("TYPE", ('INSTANT', 'IMMEDIATE', 'TEMPORARY',
+                                    'SHORT', 'MIDDLE', 'LONG', 'NIGHT'))
         '''访问策略
         # RANDOM：随机访问
         # MEAN：平均访问
@@ -61,7 +63,8 @@ class CSDNBlogVisitor():
 
     def __update_ip(self):
         '''从数据库中获取IP地址'''
-        IPs = IPPool(self.__proxy_database_name).pull(re_try_times=self.__RETRY_TIMES)
+        IPs = IPPool(
+            self.__proxy_database_name).pull(re_try_times=self.__RETRY_TIMES)
         if IPs is not None and len(IPs) > 0:
             logging.info(u"CSDNBlogVisitor:从数据库中更新代理IP...")
             self.__proxy_ip = (ip for ip in IPs)
@@ -209,10 +212,19 @@ class CSDNBlogVisitor():
             re_conn_times = 3
             headers = FakeUserAgent().random_headers()
             response = None
+            # proxies = self.__proxies()
+            proxies = None
             for i in range(re_conn_times):
                 try:
-                    response = requests.get(
-                        url=blog_page_link, headers=headers, timeout=5)
+                    if proxies is not None and proxies:
+                        response = requests.get(
+                            url=blog_page_link,
+                            headers=headers,
+                            proxies=proxies,
+                            timeout=5)
+                    else:
+                        response = requests.get(
+                            url=blog_page_link, headers=headers, timeout=5)
                     break
                 except Exception:
                     continue
@@ -277,6 +289,8 @@ class CSDNBlogVisitor():
 
     def run(self):
         p = threading.Thread(target=self.saver)
+        p2 = threading.Thread(target=self.viewer)
+        p2.start()
         p.start()
         cnt = 0
         while True:
@@ -305,9 +319,9 @@ class CSDNBlogVisitor():
             READNUM_B = sum([one['read_num'] for one in info])
             logging.info(
                 u"CSDNBlogVisitor:完成第{}轮访问，耗时：{:.2f}秒\n当前统计文章数：{}\t文章总访问次数：{}\t本轮有效访问次数：{}".
-                    format(cnt,
-                           time.time() - st, len(info), READNUM_B,
-                           int(READNUM_B - READNUM_A)))
+                format(cnt,
+                       time.time() - st, len(info), READNUM_B,
+                       int(READNUM_B - READNUM_A)))
             st = time.time()
             sleep = self.__sleep_strategy(
                 self.__TYPE.MIDDLE) * self.__sleep_factor
@@ -325,7 +339,8 @@ class CSDNBlogVisitor():
             if "read_num" in one.keys() and "id" in one.keys():
                 cnt.append(one['read_num'])
                 IDs.append(one['id'])
-        plt.figure("CSDN Visitor Counter Viewer")
+
+        plt.figure(figsize=(30, 20))
         plt.subplot(211)
         plt.bar(range(len(IDs)), cnt)
         plt.xticks(rotation=60)
@@ -339,34 +354,61 @@ class CSDNBlogVisitor():
             logging.info(u"CSDNBlogVisitor:没有保存信息...")
         else:
             time = [num[0] for num in READNUM]
-            id_num = [num[2] for num in READNUM]
-            num = [num[3] for num in READNUM]
+            id_num = [int(num[2]) for num in READNUM]
+            num = [int(num[3]) for num in READNUM]
+
+            pre_id = id_num[0]
+            pre_num = num[0]
+            for index, _id, art in zip(range(len(id_num)), id_num, num):
+                if index == 0:
+                    continue
+                if pre_id > _id:
+                    id_num[index] = pre_id
+                else:
+                    pre_id = _id
+                if pre_num > art:
+                    num[index] = pre_num
+                else:
+                    pre_num = art
 
             plt.subplot(223)
             plt.plot(id_num)
             plt.xticks(rotation=60)
-            plt.xticks(range(len(time)), time)
+            cnt = 1
+            while len(time) / cnt > 40:
+                cnt += 1
+            time2 = ["" for i in time]
+            time2[0::cnt] = [
+                time[index] for index in range(len(time)) if index % cnt == 0
+            ]
+
+            plt.xticks(range(len(time2)), time2)
             plt.xlabel("Time")
             plt.ylabel("Article Number")
 
             plt.subplot(224)
             plt.plot(num)
             plt.xticks(rotation=60)
-            plt.xticks(range(len(time)), time)
+            plt.xticks(range(len(time2)), time2)
             plt.xlabel("Time")
             plt.ylabel("Visitor Number")
-        plt.show()
+            logging.info(u"CSDNBlogVisitor:正在保存统计图...")
+            plt.savefig("../csdn_blog_viewer.jpg")
+            # plt.show()
 
-    def viewer(self, VIEW_WITH_IMG=False):
+    def viewer(self, VIEW_WITH_IMG=True):
         '''博客访问量可视化'''
-        info = self.article_info()
-        if info is None:
-            logging.info(u"CSDNBlogVisitor:获取文章信息出错！")
-            return
-        logging.info(u"CSDNBlogVisitor:统计时间：{}\t统计文章数：{}\t总计访问量：{}".format(
-            datetime.now(), len(info), sum([one['read_num'] for one in info])))
-        if VIEW_WITH_IMG:
-            self.__plotter(info)
+        while True:
+            info = self.article_info()
+            if info is None:
+                logging.info(u"CSDNBlogVisitor:获取文章信息出错！")
+                return
+            logging.info(u"CSDNBlogVisitor:统计时间：{}\t统计文章数：{}\t总计访问量：{}".format(
+                datetime.now(), len(info),
+                sum([one['read_num'] for one in info])))
+            if VIEW_WITH_IMG:
+                self.__plotter(info)
+            time.sleep(60 * 60 * 12)  # 12小时运行一次
 
     def saver(self, time_step=1 * 60 * 60):
         '''保存统计数据到数据库'''

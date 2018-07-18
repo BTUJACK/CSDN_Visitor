@@ -26,7 +26,8 @@ class IPPool(object):
             % self.__table_name)
         for one in ip:
             conn.execute(
-                "insert or ignore into %s(IP,PORT,ADDRESS,TYPE,PROTOCOL) values (?,?,?,?,?)" % (self.__table_name),
+                "insert or ignore into %s(IP,PORT,ADDRESS,TYPE,PROTOCOL) values (?,?,?,?,?)"
+                % (self.__table_name),
                 (one[0], one[1], one[2], one[3], one[4]))
         conn.commit()
         conn.close()
@@ -54,7 +55,8 @@ class IPPool(object):
             % self.__table_name)
         cur = conn.cursor()
         if random_flag:
-            cur.execute("select * from %s order by random() limit 1" % self.__table_name)
+            cur.execute("select * from %s order by random() limit 1" %
+                        self.__table_name)
             response = cur.fetchone()
         else:
             cur.execute("select * from %s" % self.__table_name)
@@ -87,7 +89,7 @@ class IPPool(object):
         cur = conn.cursor()
         if IP is not None:
             cur.execute("delete from %s where IP=?" % self.__table_name,
-                        (IP[0],))
+                        (IP[0], ))
         else:
             cur.execute("delete from %s" % self.__table_name)
         cur.close()
@@ -134,8 +136,8 @@ class InfoPool(object):
                 continue
             try:
                 conn.execute(
-                    "insert or ignore into %s(TIME,TIMESTAMP,ARTICLE_NUM,TOTAL_VISIT) values (?,?,?,?)" % (
-                        self.__table_name), (one[0], one[1], one[2], one[3]))
+                    "insert or ignore into %s(TIME,TIMESTAMP,ARTICLE_NUM,TOTAL_VISIT) values (?,?,?,?)"
+                    % (self.__table_name), (one[0], one[1], one[2], one[3]))
             except Exception:
                 continue
         conn.commit()
@@ -173,7 +175,8 @@ class InfoPool(object):
         cur = conn.cursor()
         if TIME is not None:
             try:
-                cur.execute("delete from %s where TIME=?" % self.__table_name, (TIME,))
+                cur.execute("delete from %s where TIME=?" % self.__table_name,
+                            (TIME, ))
             except Exception:
                 return False
         else:
@@ -187,37 +190,6 @@ class InfoPool(object):
 
 
 if __name__ == "__main__":
-    pool = IPPool("IP.db")
-    ip = [['127.0.0.1', 8080, 'addr', 'niming', 'HTTP'],
-          ['127.0.0.2', 8080, 'addr', 'niming', 'HTTP'],
-          ['127.0.0.3', 8080, 'addr', 'niming', 'HTTP'],
-          ['127.0.0.4', 8080, 'addr', 'niming', 'HTTP']]
-    status = pool.push(ip)
-    print(status)
-
-    for ip in pool.pull():
-        print(ip)
-    print("-.-" * 20)
-    pool.delete(IP=['127.0.0.1', 8080, 'addr', 'niming', 'HTTP'])
-    for ip in pool.pull():
-        print(ip)
-
-    pool = InfoPool("INFO.db")
-    ip = [['2018-07-10-23:40:04', 1527900, 1000, 30192],
-          ['2018-07-10-23:40:05', 1527900, 1000, 30192],
-          ['2018-07-10-23:40:06', 1527900, 1000, 30192],
-          ['2018-07-10-23:40:07', 1527900, 1000, 30192],
-          ['2018-07-10-23:40:08', 1527900, 1000, 30192]]
-    status = pool.push(ip)
-    print(status)
-
-    for ip in pool.pull():
-        print(ip)
-    print("-.-" * 20)
-    pool.delete(TIME='2018-07-10-23:40:04')
-    for ip in pool.pull():
-        print(ip)
-
     pool = IPPool("IP.db")
     for index, ip in enumerate(pool.pull()):
         print(index, ip)

@@ -41,7 +41,7 @@ Email：yooongchun@foxmail.com
     INFO:root:CSDNBlogVisitor:绘制访问信息统计图...
     ```
 
-    ![viewer](CSDN_Visitor_Counter_Viewer.png)
+    ![viewer](CSDN_Visitor_Counter_Viewer.jpg)
 
   - 自动访问只需启动`run` 函数：
 
@@ -86,14 +86,7 @@ Email：yooongchun@foxmail.com
     headers=FakeUserAgent().random_headers()
     ```
 
-    返回的是一个随机请求头，其格式范例为：
-
-    ```python
-    {'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.2) Gecko/2008070208 Firefox/3.0.1', 'Referer': 'https://so.csdn.net/so/search/s.do?q=%E3%80%90%E5%9B%BE%E5%83%8F%E5%A4%84%E7%90%86%E4%B8%93%E9%A2%98%EF%BC%88%E4%B8%80%EF%BC%89%E3%80%91%E5%9B%BE%E5%83%8F%E8%BE%B9%E7%BC%98%E7%89%B9%E5%BE%81%E6%8F%90%E5%8F%96&t=%20&u=', 'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8', 'Accept-Encoding': 'gzip, deflate, br', 'Cache-Control': 'max-age=0', 'Connection': 'keep-alive', 'Host': 'blog.csdn.net', 'Upgrade-Insecure-Requests': '1'}
-    {'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)', 'Referer': 'https://www.google.com.hk/', 'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8', 'Accept-Encoding': 'gzip, deflate, br', 'Cache-Control': 'max-age=0', 'Connection': 'keep-alive', 'Host': 'blog.csdn.net', 'Upgrade-Insecure-Requests': '1'}
-    ```
-
-    
+    返回的是一个随机请求头
 
   - `database.py` 模块：该模块用来提供数据的存取功能，使用数据库`SQLite` 完成，主要包括了两个类一个是`IP_Pool` 类，用来存取IP地址，另一个是`INFO_Pool`，用来存取博客信息。
 

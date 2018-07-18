@@ -19,15 +19,13 @@ from UA import FakeUserAgent
 import logging
 import config
 
-config.CONFIG(to_file=True, level="ERROR", file_path="proxy.log")
+config.config()
 
 
 class Crawl(object):
     '''抓取网页内容获取IP地址保存到数据库中'''
 
-    def __init__(self,
-                 proxy_database=None,
-                 database_name="ALL-IP.db"):
+    def __init__(self, proxy_database="IP.db", database_name="ALL-IP.db"):
         self.__URLs = self.__url()  # 访问的URL列表
         self.__DATABASE_NAME = database_name  # 数据库名称
         self.__RETRY_TIMES = 10  # 数据库访问重试次数
@@ -82,7 +80,8 @@ class Crawl(object):
 
     def __proxies(self, database_name):
         '''构造代理IP,需要提供代理IP保存的数据库名称和表名'''
-        ip = IPPool(database_name).pull(random_flag=True, re_try_times=self.__RETRY_TIMES)
+        ip = IPPool(database_name).pull(
+            random_flag=True, re_try_times=self.__RETRY_TIMES)
         if ip:
             IP = str(ip[0]) + ":" + str(ip[1])
             return {"http": "http://" + IP}
@@ -152,7 +151,7 @@ class Crawl(object):
         else:
             IPPool(self.__DATABASE_NAME).push(ip)
 
-    def multiple_crawl(self, thread_num=10, sleep_time=15 * 60):
+    def multiple_crawl(self, thread_num=50, sleep_time=15 * 60):
         '''多线程抓取'''
         count = 0
         while True:
@@ -160,7 +159,8 @@ class Crawl(object):
             logging.info(u"ProxyIP-Crawl:开始第{}轮抓取,当前url数：{}".format(
                 count, len(self.__URLs)))
             IP_NUM_A = len(
-                IPPool(self.__DATABASE_NAME).pull(re_try_times=self.__RETRY_TIMES))
+                IPPool(self.__DATABASE_NAME).pull(
+                    re_try_times=self.__RETRY_TIMES))
             cnt = 0
             st = time.time()
             while cnt < len(self.__URLs):
@@ -180,7 +180,7 @@ class Crawl(object):
                     logging.info(
                         u"ProxyIP-Crawl:抓取URL：{}\t 进度：{}/{}\t{:.2f}%".format(
                             url, cnt + 1, len(self.__URLs),
-                                 (cnt + 1) / len(self.__URLs) * 100))
+                            (cnt + 1) / len(self.__URLs) * 100))
                     th.start()
                     time.sleep(2 * random.random())  # 随机休眠，均值：0.5秒
                     cnt += 1
@@ -188,10 +188,11 @@ class Crawl(object):
                     th.join()
             ed = time.time()
             IP_NUM_B = len(
-                IPPool(self.__DATABASE_NAME).pull(re_try_times=self.__RETRY_TIMES))
+                IPPool(self.__DATABASE_NAME).pull(
+                    re_try_times=self.__RETRY_TIMES))
             logging.info(
                 u"ProxyIP-Crawl:第{}轮抓取完成,耗时：{:.2f}秒，共计抓取到IP：{}条，当前IP池中IP数：{}条".
-                    format(count, ed - st, IP_NUM_B - IP_NUM_A, IP_NUM_B))
+                format(count, ed - st, IP_NUM_B - IP_NUM_A, IP_NUM_B))
             st = time.time()
             while time.time() - st < sleep_time:
                 logging.info(
@@ -251,11 +252,13 @@ class Validation(object):
     def __filter_ip(self, ip):
         '''验证数据库中的IP地址是否有效,校验后删除'''
         if self.__check_ip_validation(ip) and self.__check_ip_anonumous(ip):
-            IPPool(self.__IP_DATABASE).push([ip], re_try_times=self.__RETRY_TIMES)
+            IPPool(self.__IP_DATABASE).push(
+                [ip], re_try_times=self.__RETRY_TIMES)
         # 校验后删除
-        IPPool(self.__ALL_IP_DATABASE).delete(IP=ip, re_try_times=self.__RETRY_TIMES)
+        IPPool(self.__ALL_IP_DATABASE).delete(
+            IP=ip, re_try_times=self.__RETRY_TIMES)
 
-    def multiple_filter(self, thread_num=10, sleep=15 * 60):
+    def multiple_filter(self, thread_num=50, sleep=15 * 60):
         '''多线程验证'''
         IPs = IPPool(
             self.__ALL_IP_DATABASE, ).pull(re_try_times=self.__RETRY_TIMES)
@@ -275,7 +278,7 @@ class Validation(object):
                         u"ProxyIP-Validation:校验进度：{}/{}\t{:.2f}%".format(
                             cnt, len(IPs), cnt / len(IPs) * 100))
                     th = threading.Thread(
-                        target=self.__filter_ip, args=(IPs[cnt],))
+                        target=self.__filter_ip, args=(IPs[cnt], ))
                     th.start()
                     time.sleep(2 * random.random())
                     pool.append(th)
@@ -283,11 +286,11 @@ class Validation(object):
                 for th in pool:
                     th.join()
             ed = time.time()
-            IP = IPPool(self.__IP_DATABASE).pull(
-                re_try_times=self.__RETRY_TIMES)
+            IP = IPPool(
+                self.__IP_DATABASE).pull(re_try_times=self.__RETRY_TIMES)
             logging.info(
                 u"ProxyIP-Validation:第{}轮验证结束，耗时：{:.2f}\t共计验证IP:{}条\t当前IP池中有效IP:{}条".
-                    format(count, ed - st, len(IPs), len(IP)))
+                format(count, ed - st, len(IPs), len(IP)))
             st = time.time()
             while time.time() - st < sleep:
                 logging.info(u"ProxyIP-Validation:休眠倒计时：{:.2f}秒".format(
@@ -297,12 +300,12 @@ class Validation(object):
     def __validation(self, ip):
         '''校验有效IP池中的IP有效性，无效则删除'''
         if not self.__check_ip_validation(ip):
-            IPPool(self.__IP_DATABASE).delete(IP=ip, re_try_times=self.__RETRY_TIMES)
+            IPPool(self.__IP_DATABASE).delete(
+                IP=ip, re_try_times=self.__RETRY_TIMES)
 
     def multiple_validation(self, thread_num=20, sleep=15 * 60):
         '''定时校验有效IP池里的IP，无效的删除'''
-        IPs = IPPool(
-            self.__IP_DATABASE).pull(re_try_times=self.__RETRY_TIMES)
+        IPs = IPPool(self.__IP_DATABASE).pull(re_try_times=self.__RETRY_TIMES)
         count = 0
         while True:
             count += 1
@@ -318,14 +321,15 @@ class Validation(object):
                         u"ProxyIP-Validation:校验进度：{}/{}\t{:.2f}%".format(
                             cnt, len(IPs), cnt / len(IPs) * 100))
                     th = threading.Thread(
-                        target=self.__validation, args=(IPs[cnt],))
+                        target=self.__validation, args=(IPs[cnt], ))
                     th.start()
                     time.sleep(2 * random.random())
                     pool.append(th)
                     cnt += 1
                 for th in pool:
                     th.join()
-            ips = IPPool(self.__IP_DATABASE).pull(re_try_times=self.__RETRY_TIMES)
+            ips = IPPool(
+                self.__IP_DATABASE).pull(re_try_times=self.__RETRY_TIMES)
             logging.info(u"ProxyIP-Validation:完成第{}次校验，当前有效IP数：{}".format(
                 count, len(ips)))
             logging.info(u"ProxyIP-Validation:进入休眠：{} 秒".format(sleep))
@@ -347,7 +351,6 @@ def main():
     p1 = Process(target=crawl.run)
     p1.start()
     Validation().run()
-    p1.join()
 
 
 if __name__ == "__main__":
