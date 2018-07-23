@@ -35,7 +35,7 @@ class CSDNBlogVisitor():
                  bolgger="zyc121561",
                  proxy_database_name="IP.db",
                  info_database_name="../INFO.db",
-                 sleep_factor=0.1):
+                 sleep_factor=0.5):
         self.__bloger = bolgger
         self.__host = "blog.csdn.net"
         self.__proxy_database_name = proxy_database_name
@@ -289,8 +289,6 @@ class CSDNBlogVisitor():
 
     def run(self):
         p = threading.Thread(target=self.saver)
-        p2 = threading.Thread(target=self.viewer)
-        p2.start()
         p.start()
         cnt = 0
         while True:
@@ -349,7 +347,19 @@ class CSDNBlogVisitor():
         plt.ylabel("Visitor Number")
         plt.title("Visitor Number--Article ID Figure")
 
-        READNUM = InfoPool(self.__info_database_name).pull()
+        try:
+            logging.info(u"CSDNBlogVisitor:正在从服务器上下载数据...")
+            response = requests.get(
+                url="http://www.yooongchun.com/?name=CSDN",
+                headers=FakeUserAgent().random_headers(),
+                timeout=5)
+        except Exception:
+            logging.info(u"CSDNBlogVisitor:从服务器中下载数据出错!")
+            response = None
+        if response is not None:
+            with open("INFO.db", "wb") as fp:
+                fp.write(response.content)
+        READNUM = InfoPool("INFO.db").pull()
         if READNUM is None or len(READNUM) < 1:
             logging.info(u"CSDNBlogVisitor:没有保存信息...")
         else:
@@ -393,22 +403,19 @@ class CSDNBlogVisitor():
             plt.xlabel("Time")
             plt.ylabel("Visitor Number")
             logging.info(u"CSDNBlogVisitor:正在保存统计图...")
-            plt.savefig("../csdn_blog_viewer.jpg")
-            # plt.show()
+            plt.savefig("csdn_blog_viewer.jpg")
+            plt.show()
 
     def viewer(self, VIEW_WITH_IMG=True):
         '''博客访问量可视化'''
-        while True:
-            info = self.article_info()
-            if info is None:
-                logging.info(u"CSDNBlogVisitor:获取文章信息出错！")
-                return
-            logging.info(u"CSDNBlogVisitor:统计时间：{}\t统计文章数：{}\t总计访问量：{}".format(
-                datetime.now(), len(info),
-                sum([one['read_num'] for one in info])))
-            if VIEW_WITH_IMG:
-                self.__plotter(info)
-            time.sleep(60 * 60 * 12)  # 12小时运行一次
+        info = self.article_info()
+        if info is None:
+            logging.info(u"CSDNBlogVisitor:获取文章信息出错！")
+            return
+        logging.info(u"CSDNBlogVisitor:统计时间：{}\t统计文章数：{}\t总计访问量：{}".format(
+            datetime.now(), len(info), sum([one['read_num'] for one in info])))
+        if VIEW_WITH_IMG:
+            self.__plotter(info)
 
     def saver(self, time_step=1 * 60 * 60):
         '''保存统计数据到数据库'''
@@ -444,10 +451,19 @@ class CSDNBlogVisitor():
                 logging.error(u"CSDNBlogVisitor-save:信息统计出错！")
             finally:
                 logging.info(u"CSDNBlogVisitor-save:休眠中...")
+                baseline = 0.5
+                increasement = 0.5
+                # 一年内会降低到约baseline
+                self.__sleep_factor = baseline + increasement * random.random(
+                ) * (365 * 3600 * 24) / (
+                    365 * 3600 * 24 + time.time() - 1532183139.8105078
+                )  # 休眠因子，随机在baseline到baseline+increasement之间，测试结果是休眠因子为0.5时每小时访问量约200
+                logging.info(
+                    u"CSDNBlogVisitor-save:休眠因子当前为 %s" % self.__sleep_factor)
                 time.sleep(time_step)
 
 
 if __name__ == "__main__":
     visitor = CSDNBlogVisitor(bolgger="zyc121561")
     visitor.run()
-    # visitor.viewer(VIEW_WITH_IMG=True)
+    # visitor.viewer()

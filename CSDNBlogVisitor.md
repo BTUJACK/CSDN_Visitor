@@ -8,7 +8,7 @@ Email：yooongchun@foxmail.com
 
 微信公众号：yooongchun小屋
 
-![yooongchun小屋](yooongchun小屋.jpg)
+![yooongchun小屋](yooongchun_cabin.jpg)
 
 ---
 
@@ -41,7 +41,7 @@ Email：yooongchun@foxmail.com
     INFO:root:CSDNBlogVisitor:绘制访问信息统计图...
     ```
 
-    ![viewer](CSDN_Visitor_Counter_Viewer.jpg)
+    ![viewer](csdn_blog_viewer.jpg)
 
   - 自动访问只需启动`run` 函数：
 

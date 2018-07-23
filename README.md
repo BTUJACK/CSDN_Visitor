@@ -8,7 +8,7 @@
 
   微信公众号：yooongchun小屋
 
-  ![yooongchun小屋](yooongchun%E5%B0%8F%E5%B1%8B.jpg)
+  ![yooongchun小屋](yooongchun_cabin.jpg)
 
   ------
 
@@ -41,7 +41,7 @@
       INFO:root:CSDNBlogVisitor:绘制访问信息统计图...
       ```
 
-      ![viewer](CSDN_Visitor_Counter_Viewer.jpg)
+      ![viewer](csdn_blog_viewer.jpg)
 
     - 自动访问只需启动`run` 函数：
 
