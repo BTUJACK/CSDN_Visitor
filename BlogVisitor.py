@@ -337,8 +337,9 @@ class CSDNBlogVisitor():
             if "read_num" in one.keys() and "id" in one.keys():
                 cnt.append(one['read_num'])
                 IDs.append(one['id'])
-
+        plt.style.use('dark_background')
         plt.figure(figsize=(30, 20))
+
         plt.subplot(211)
         plt.bar(range(len(IDs)), cnt)
         plt.xticks(rotation=60)
@@ -382,6 +383,7 @@ class CSDNBlogVisitor():
                     pre_num = art
 
             plt.subplot(223)
+
             plt.plot(id_num)
             plt.xticks(rotation=60)
             cnt = 1
@@ -397,6 +399,7 @@ class CSDNBlogVisitor():
             plt.ylabel("Article Number")
 
             plt.subplot(224)
+
             plt.plot(num)
             plt.xticks(rotation=60)
             plt.xticks(range(len(time2)), time2)
@@ -463,7 +466,8 @@ class CSDNBlogVisitor():
                 time.sleep(time_step)
 
 
+1
 if __name__ == "__main__":
     visitor = CSDNBlogVisitor(bolgger="zyc121561")
-    visitor.run()
-    # visitor.viewer()
+    # visitor.run()
+    visitor.viewer()
